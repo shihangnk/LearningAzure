@@ -33,34 +33,41 @@ namespace AzureCosmosDB1
             // Retrieve a reference to the table.
             _table = tableClient.GetTableReference("people");
 
-            // Create the table if it doesn't exist.
-            _table.CreateIfNotExists();
-
             var obj = new Program();
+
+//            obj.deleteTable();
+
+            // Create the table if it doesn't exist.
+  //          Console.Out.WriteLine("Wait 10 seconds for table to be deleted from server");
+    //        Thread.Sleep(10000);
+ //           _table.CreateIfNotExists();
+
             //          obj.insert();
 
 
             /*
                         for (int i = 0; i < 50; i++)
                         {
-                            obj.batchInser();
+                            obj.batchInsert();
                         }
             */
             //            obj.getPagedRecords();
 
+//            obj.insertDifferentEntityTypesInSameTable();
+            obj.retrieveDifferentEntityTypes();
 
             //  obj.retrieveARangeOfEntitiesInAPartition();
             /*
                         obj.retrieveASingleEntity(new Tuple<string, string>("Mike", "Jordan"));
             */
             // obj.replaceAnEntity();
-            
+
             //obj.insertOrReplace();
-            obj.conflict();
-//            obj.insertOrMerge();
+            //obj.conflict();
+            //            obj.insertOrMerge();
             //obj.retrieveSubsetOfEntityProperties();
             //            obj.deleteEntity();
-             //obj.deleteTable();
+            //obj.deleteTable();
         }
 
         private void insert()
@@ -69,7 +76,62 @@ namespace AzureCosmosDB1
             _table.Execute(insertOperation);
         }
 
-        private void batchInser()
+        private void insert(CustomerEntity entity)
+        {
+            _table.Execute(TableOperation.Insert(entity));
+        }
+
+        private void insertDifferentEntityTypesInSameTable()
+        {
+            insert(new CustomerEntity("firstName", "lastName", "email", "phoneNumber"));
+            insert(new MyCustomerEntity("firstName", "lastName1", "email111", "phoneNumber1111", "Canada"));
+        }
+
+        private void retrieveDifferentEntityTypes()
+        {
+            string filter = TableQuery.CombineFilters(
+                TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, "firstName"),
+                TableOperators.And,
+                TableQuery.CombineFilters(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, "last"),
+                    TableOperators.And,
+                    TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThan, "m")
+                )
+            );
+            // one query method
+            TableQuery<DynamicTableEntity> entityQuery = new TableQuery<DynamicTableEntity>().Where(filter);
+            var employees = _table.ExecuteQuery(entityQuery);
+            foreach (var dynamicTableEntity in employees)
+            {
+                EntityProperty entityTypeProperty;
+                if (dynamicTableEntity.Properties.TryGetValue("Country", out entityTypeProperty))
+                {
+                    Console.Out.WriteLine("------find property Country with entityTypeProperty.StringValue [" + entityTypeProperty.StringValue + "]");
+                    if (entityTypeProperty.StringValue == "Canada")
+                    {
+                        // Use entityTypeProperty, RowKey, PartitionKey, Etag, and Timestamp
+                        Console.Out.WriteLine("-------[" + entityTypeProperty.StringValue + "]");
+                    }
+                }
+            }
+
+            // another query method, this is better for less code
+            IEnumerable<DynamicTableEntity> entities = _table.ExecuteQuery(entityQuery);
+            foreach (var e in entities)
+            {
+                EntityProperty entityTypeProperty;
+                if (e.Properties.TryGetValue("Country", out entityTypeProperty))
+                {
+                    Console.Out.WriteLine("find property Country with entityTypeProperty.StringValue ["+ entityTypeProperty.StringValue+"]");
+                    if (entityTypeProperty.StringValue == "Canada")
+                    {
+                        // Use entityTypeProperty, RowKey, PartitionKey, Etag, and Timestamp
+                        Console.Out.WriteLine("["+ entityTypeProperty.StringValue+"]");
+                    }
+                }
+            }
+        }
+
+        private void batchInsert()
         {
             TableBatchOperation batchOperation = new TableBatchOperation();
 
